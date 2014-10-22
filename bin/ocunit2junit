@@ -34,10 +34,13 @@ class ReportParser
 
   attr_reader :exit_code
   
-  def initialize(piped_input)
+  def initialize(piped_input, multiple_test_runs)
     @piped_input = piped_input
     @exit_code = 0
-    
+    if multiple_test_runs
+      @test_suites = Hash.new # test_name => count
+    end
+
     FileUtils.rm_rf(TEST_REPORTS_FOLDER)
     FileUtils.mkdir_p(TEST_REPORTS_FOLDER)
     parse_input
@@ -130,7 +133,17 @@ class ReportParser
 
   def handle_end_test_suite(test_name,end_time)
     unless @ended_current_test_suite
-      current_file = File.open("#{TEST_REPORTS_FOLDER}/TEST-#{test_name}.xml", 'w')
+      file_name_increment = ""
+      if @test_suites
+        if @test_suites.has_key?(test_name)
+          next_increment = @test_suites[test_name] + 1
+          file_name_increment = "_#{next_increment}"
+          @test_suites[test_name] = next_increment
+        else
+          @test_suites[test_name] = 0
+        end
+      end
+      current_file = File.open("#{TEST_REPORTS_FOLDER}/TEST-#{test_name}#{file_name_increment}.xml", 'w')
       host_name = string_to_xml Socket.gethostname
       test_name = string_to_xml test_name
       test_duration = (end_time - @cur_start_time).to_s
@@ -206,9 +219,19 @@ class ReportParser
 end
 
 #Main
+
+support_multiple_test_runs = false
+ARGV.each do|a|
+  if a == "--multiple" || a == "-m"
+    # there are multiple destinations, be sure to loop save the test suites separately
+    support_multiple_test_runs = true
+    ARGV.delete(a)
+  end
+end
+
 #piped_input = File.open("tests_fail.txt") # for debugging this script
 piped_input = ARGF.readlines
 
-report = ReportParser.new(piped_input)
+report = ReportParser.new(piped_input, support_multiple_test_runs)
 
 exit report.exit_code
