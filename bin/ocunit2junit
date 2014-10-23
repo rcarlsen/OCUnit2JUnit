@@ -29,6 +29,7 @@ SUPPORT_KIWI = ENV.has_key?('SUPPORT_KIWI') ? ENV['SUPPORT_KIWI'] : true
 require 'time'
 require 'fileutils'
 require 'socket'
+require 'optparse'
 
 class ReportParser
 
@@ -219,19 +220,23 @@ class ReportParser
 end
 
 #Main
+options = { }
+opt_parser = OptionParser.new do |opt|
+  opt.banner = "Usage: #{$0} [OPTIONS]"
+  opt.separator  ""
+  opt.separator  "OPTIONS"
 
-support_multiple_test_runs = false
-ARGV.each do|a|
-  if a == "--multiple" || a == "-m"
-    # there are multiple destinations, be sure to loop save the test suites separately
-    support_multiple_test_runs = true
-    ARGV.delete(a)
+  opt.on("-m","--multiple","Expect multiple test runs. Saves each test suite separately.") do |heading|
+    options[:multiple] = true
   end
 end
+opt_parser.parse!
+
+options[:multiple] = false if options[:multiple].nil?
 
 #piped_input = File.open("tests_fail.txt") # for debugging this script
 piped_input = ARGF.readlines
 
-report = ReportParser.new(piped_input, support_multiple_test_runs)
+report = ReportParser.new(piped_input, options[:multiple])
 
 exit report.exit_code
